@@ -1,4 +1,5 @@
 import { createOutboundCall } from "@/lib/vapi";
+import { saveCall } from "@/lib/calling-store";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,7 +8,9 @@ export async function POST(request: Request) {
   try {
     const parsed = callSchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: "Valid recorded consent and lead details are required.", issues: parsed.error.flatten() }, { status: 400 });
-    return NextResponse.json(await createOutboundCall(parsed.data), { status: 202 });
+    const result = await createOutboundCall(parsed.data);
+    await saveCall({ ...result, leadName: parsed.data.name, company: parsed.data.company ?? null, phoneLast4: parsed.data.phone.slice(-4), consentVerified: true, direction: "outbound" });
+    return NextResponse.json(result, { status: 202 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to start call." }, { status: 502 });
   }

@@ -12,6 +12,10 @@ npm run dev
 
 Open `http://localhost:3000`. Without Vapi keys the calling API intentionally returns demo-mode results.
 
+## Firebase backend
+
+Create a separate Firebase project, enable Firestore, and add the three server-side service-account values from `.env.example`. Without them the app stays in safe demo mode. Deploy `firestore.rules` so browsers cannot access private lead or transcript records directly; all writes go through validated server routes.
+
 ## CSV format
 
 ```csv

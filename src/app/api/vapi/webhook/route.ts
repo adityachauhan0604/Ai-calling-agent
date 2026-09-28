@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { saveCall } from "@/lib/calling-store";
 
 function validSignature(rawBody: string, signature: string | null) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
@@ -12,5 +13,9 @@ function validSignature(rawBody: string, signature: string | null) {
 export async function POST(request: Request) {
   const rawBody = await request.text();
   if (!validSignature(rawBody, request.headers.get("x-vapi-signature"))) return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  const payload = JSON.parse(rawBody) as Record<string, unknown>;
+  const message = (payload.message ?? payload) as Record<string, unknown>;
+  const call = (message.call ?? {}) as Record<string, unknown>;
+  await saveCall({ id: call.id, type: message.type, status: call.status, endedReason: message.endedReason, analysis: message.analysis, transcript: message.transcript });
   return NextResponse.json({ received: true });
 }
