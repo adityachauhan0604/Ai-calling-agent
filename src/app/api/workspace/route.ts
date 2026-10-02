@@ -1,0 +1,4 @@
+import { requireUser } from "@/lib/firebase-admin";
+import { listWorkspace } from "@/lib/calling-store";
+import { NextResponse } from "next/server";
+export async function GET(request: Request) { try { const user = await requireUser(request); return NextResponse.json(await listWorkspace(user.uid)); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); } }

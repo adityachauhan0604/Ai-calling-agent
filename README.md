@@ -37,3 +37,14 @@ Create a Vapi assistant and phone number, then set the server-only values shown 
 - Disclose that the caller is an AI assistant.
 - Encrypt recordings/transcripts, apply retention limits, and restrict workspace access.
 - Add authentication and durable storage before using real customer data.
+
+## Production workflow now included
+
+- Firebase email/password workspace authentication and server-side ID-token checks.
+- Campaign creation with language, pitch, daily limit, concurrency and calling window.
+- Consent timestamp validation, phone deduplication and Do-Not-Call suppression.
+- Authenticated workspace APIs and a protected Vercel queue endpoint.
+- Bounded retries, calling-window enforcement and Vapi call/webhook persistence.
+- Automatic verbal opt-out detection from completed-call transcripts.
+
+The scheduled queue is intentionally once daily for Vercel Hobby compatibility. For continuous production calling, invoke `/api/cron/call-queue` from an approved scheduler or move to a Vercel plan that supports the required frequency. Never increase call volume before telephony registration, consent evidence, caller disclosure and suppression testing are complete.

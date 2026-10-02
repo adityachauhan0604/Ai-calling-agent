@@ -1,7 +1,8 @@
 "use client";
 
 import { Activity, BarChart3, CalendarCheck, Check, ChevronDown, CirclePause, Clock3, FileUp, Headphones, LayoutDashboard, ListFilter, Mic2, MoreHorizontal, Phone, PhoneCall, PhoneOff, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Upload, Users, X } from "lucide-react";
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api-auth";
 
 type Lead = { name: string; company: string; phone: string; source: string; consent: boolean; status: "Qualified" | "Follow-up" | "Not interested" | "Calling" | "Queued"; score: number; lastCall: string };
 const initialLeads: Lead[] = [
@@ -21,19 +22,22 @@ export default function Home() {
   const [campaignActive, setCampaignActive] = useState(true);
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
+  const [showCampaign, setShowCampaign] = useState(false);
   const filteredLeads = useMemo(() => leads.filter((lead) => `${lead.name} ${lead.company} ${lead.status}`.toLowerCase().includes(search.toLowerCase())), [leads, search]);
 
   function importLeads(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const rows = String(reader.result).split(/\r?\n/).slice(1).filter(Boolean);
       const imported = rows.slice(0, 1000).map((row, index): Lead => {
         const [name = `Lead ${index + 1}`, company = "Unknown business", phone = "", source = "CSV upload", consent = ""] = row.split(",").map((cell) => cell.trim());
         return { name, company, phone, source, consent: /true|yes|1|opt-in/i.test(consent), status: "Queued", score: 0, lastCall: "—" };
       }).filter((lead) => lead.phone && lead.consent);
       setLeads((current) => [...imported, ...current]);
-      setNotice(`${imported.length} consent-verified leads imported. Non-consented rows were skipped.`);
+      const saved = await Promise.all(imported.map((lead) => apiFetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: lead.name, company: lead.company, phone: lead.phone.replace(/\s/g, ""), source: lead.source, consent: true, consentAt: new Date().toISOString() }) })));
+      const accepted = saved.filter((response) => response.ok).length;
+      setNotice(`${accepted} consent-verified leads saved. Non-consented or invalid rows were skipped.`);
       window.setTimeout(() => setNotice(""), 5000);
     };
     reader.readAsText(file); event.target.value = "";
@@ -44,6 +48,7 @@ export default function Home() {
     if (!campaignActive) setNotice("Campaign is ready. Connect Vapi credentials to place real calls.");
     setCampaignActive((value) => !value);
   }
+  async function createCampaign(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const data = new FormData(event.currentTarget); const response = await apiFetch("/api/campaigns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: String(data.get("name")), language: String(data.get("language")), pitch: String(data.get("pitch")), dailyLimit: Number(data.get("dailyLimit")), concurrency: Number(data.get("concurrency")), timezone: "Asia/Kolkata", startHour: 10, endHour: 18 }) }); if (response.ok) { setShowCampaign(false); setNotice("Campaign created in paused mode. Review leads before starting calls."); } else setNotice("Campaign could not be created. Check configuration."); }
 
   return <main className="app-shell">
     <aside className="sidebar">
@@ -52,7 +57,7 @@ export default function Home() {
       <div className="sidebar-bottom"><div className="compliance-card"><ShieldCheck size={19} /><div><strong>Consent guard active</strong><p>Only verified opt-in leads can be called.</p></div></div><button className="nav-item"><Settings size={18} /><span>Settings</span></button><div className="profile"><span>AC</span><div><strong>Aditya</strong><p>Workspace owner</p></div><MoreHorizontal size={17} /></div></div>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div><p className="eyebrow">SALES COMMAND CENTER</p><h1>Good evening, Aditya</h1></div><div className="top-actions"><button className="icon-button" aria-label="Activity"><Activity size={19} /></button><label className="button secondary upload-button"><Upload size={17} /> Import leads<input type="file" accept=".csv,text/csv" onChange={importLeads} /></label><button className="button primary"><Plus size={17} /> New campaign</button></div></header>
+      <header className="topbar"><div><p className="eyebrow">SALES COMMAND CENTER</p><h1>Good evening, Aditya</h1></div><div className="top-actions"><button className="icon-button" aria-label="Activity"><Activity size={19} /></button><label className="button secondary upload-button"><Upload size={17} /> Import leads<input type="file" accept=".csv,text/csv" onChange={importLeads} /></label><button className="button primary" onClick={()=>setShowCampaign(true)}><Plus size={17} /> New campaign</button></div></header>
       {notice && <div className="notice"><Check size={16} />{notice}<button onClick={() => setNotice("")} aria-label="Dismiss"><X size={15} /></button></div>}
       <div className="metrics-grid">
         <article className="metric"><div><p>Calls today</p><strong>128</strong></div><span className="metric-icon lilac"><Phone size={19} /></span><small><b>+18%</b> from yesterday</small></article>
@@ -65,6 +70,6 @@ export default function Home() {
         <section className="panel campaign-panel"><div className="panel-heading"><div>Active campaign</div><button aria-label="Campaign options"><MoreHorizontal size={19} /></button></div><div className="campaign-title"><div><span className="campaign-icon"><PhoneCall size={20} /></span><div><h2>Website & automation outreach</h2><p>Hindi + English · Maya</p></div></div><span className={campaignActive ? "campaign-state" : "campaign-state paused"}>{campaignActive ? "RUNNING" : "PAUSED"}</span></div><div className="progress-label"><span>Daily progress</span><strong>128 / 200</strong></div><div className="progress"><span style={{ width: "64%" }} /></div><div className="campaign-stats"><div><strong>42</strong><span>Remaining</span></div><div><strong>4</strong><span>In queue</span></div><div><strong>2</strong><span>Concurrent</span></div></div><div className="schedule"><Clock3 size={17} /><div><strong>Calling window</strong><p>10:00 AM – 6:30 PM IST · Mon–Sat</p></div></div><button className="button campaign-action" onClick={toggleCampaign}>{campaignActive ? <><CirclePause size={17} /> Pause campaign</> : <><Play size={17} /> Resume campaign</>}</button></section>
       </div>
       <section className="panel leads-panel"><div className="leads-header"><div><h2>Recent leads</h2><p>AI-qualified outcomes from your latest calls</p></div><div className="table-actions"><label className="search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search leads" /></label><button className="filter-button"><ListFilter size={16} /> Filter <ChevronDown size={14} /></button></div></div><div className="table-wrap"><table><thead><tr><th>Lead</th><th>Source</th><th>Status</th><th>AI score</th><th>Last call</th><th aria-label="Actions" /></tr></thead><tbody>{filteredLeads.map((lead) => <tr key={`${lead.name}-${lead.company}`}><td><div className="lead-name"><span>{lead.name.split(" ").map((part) => part[0]).join("")}</span><div><strong>{lead.name}</strong><p>{lead.company} · {lead.phone}</p></div></div></td><td>{lead.source}</td><td><span className={statusStyle[lead.status]}>{lead.status === "Calling" && <i />} {lead.status}</span></td><td><div className="score"><span><i style={{ width: `${lead.score}%` }} /></span><b>{lead.score || "—"}</b></div></td><td>{lead.lastCall}</td><td><button className="row-menu" aria-label={`Actions for ${lead.name}`}><MoreHorizontal size={17} /></button></td></tr>)}</tbody></table>{!filteredLeads.length && <div className="empty-state"><FileUp size={24} /><strong>No leads found</strong><p>Try a different search or import a consent-verified CSV.</p></div>}</div></section>
-    </section>
+    </section>{showCampaign&&<div className="modal-backdrop" role="presentation" onMouseDown={()=>setShowCampaign(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="campaign-title" onMouseDown={(e)=>e.stopPropagation()}><button className="modal-close" onClick={()=>setShowCampaign(false)} aria-label="Close"><X size={18}/></button><p className="eyebrow">NEW OUTBOUND CAMPAIGN</p><h2 id="campaign-title">Configure AI outreach</h2><form onSubmit={createCampaign}><label>Campaign name<input name="name" defaultValue="Website & automation outreach" required/></label><label>Language<select name="language" defaultValue="hinglish"><option value="hinglish">Hindi + English</option><option value="hi">Hindi</option><option value="en">English</option></select></label><label>Sales pitch<textarea name="pitch" defaultValue="Introduce our website and business automation services, understand the lead's current process, qualify need, budget, authority and timeline, then offer a demo meeting." required/></label><div className="form-row"><label>Daily limit<input name="dailyLimit" type="number" min="1" max="500" defaultValue="100"/></label><label>Concurrent calls<input name="concurrency" type="number" min="1" max="10" defaultValue="2"/></label></div><div className="modal-actions"><button type="button" className="button" onClick={()=>setShowCampaign(false)}>Cancel</button><button className="button primary">Create paused campaign</button></div></form></section></div>}
   </main>;
 }

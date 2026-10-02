@@ -1,0 +1,6 @@
+{
+  "indexes": [
+    { "collectionGroup": "leads", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "status", "order": "ASCENDING" }, { "fieldPath": "dnc", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": []
+}

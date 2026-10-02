@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { saveCall } from "@/lib/calling-store";
+import { markLead, saveCall } from "@/lib/calling-store";
 
 function validSignature(rawBody: string, signature: string | null) {
   const secret = process.env.VAPI_WEBHOOK_SECRET;
@@ -17,5 +17,8 @@ export async function POST(request: Request) {
   const message = (payload.message ?? payload) as Record<string, unknown>;
   const call = (message.call ?? {}) as Record<string, unknown>;
   await saveCall({ id: call.id, type: message.type, status: call.status, endedReason: message.endedReason, analysis: message.analysis, transcript: message.transcript });
+  const leadId = typeof call.metadata === "object" && call.metadata ? String((call.metadata as Record<string, unknown>).leadId ?? "") : "";
+  const transcript = String(message.transcript ?? "").toLowerCase();
+  if (leadId && /do not call|don't call|call mat|phone mat|opt.?out/.test(transcript)) await markLead(leadId, { dnc: true, status: "do_not_call", dncReason: "Verbal opt-out" });
   return NextResponse.json({ received: true });
 }

@@ -1,5 +1,5 @@
 const VAPI_BASE_URL = "https://api.vapi.ai";
-export type OutboundCallInput = { name: string; phone: string; company?: string; consent: boolean };
+export type OutboundCallInput = { name: string; phone: string; company?: string; consent: boolean; id?: string };
 
 export async function createOutboundCall(input: OutboundCallInput) {
   const apiKey = process.env.VAPI_API_KEY;
@@ -9,7 +9,7 @@ export async function createOutboundCall(input: OutboundCallInput) {
   const response = await fetch(`${VAPI_BASE_URL}/call/phone`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ assistantId, phoneNumberId, customer: { number: input.phone, name: input.name }, assistantOverrides: { variableValues: { leadName: input.name, companyName: input.company ?? "your business" } } }),
+    body: JSON.stringify({ assistantId, phoneNumberId, customer: { number: input.phone, name: input.name }, metadata: { leadId: input.id }, assistantOverrides: { variableValues: { leadName: input.name, companyName: input.company ?? "your business", disclosure: "I am an AI calling assistant", objective: "Qualify need, budget, authority and timeline, then book a demo without making false promises." } } }),
     signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) throw new Error(`Calling provider rejected the request (${response.status}).`);
